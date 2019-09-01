@@ -2,6 +2,8 @@ import 'dart:collection';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 
 void main() => runApp(ChangeNotifierProvider(
       builder: (context) => NotesModel(),
@@ -30,7 +32,7 @@ class NotesWidget extends StatelessWidget {
           body: ListView.builder(
               itemCount: notes.get().length,
               itemBuilder: (context, position) {
-                MapEntry<int, String> note = notes.get()[position];
+                MapEntry<String, String> note = notes.get()[position];
 
                 return ListTile(
                   title: Text(note.value),
@@ -59,7 +61,7 @@ class NotesWidget extends StatelessWidget {
 }
 
 class NewNoteWidget extends StatelessWidget {
-  final int id;
+  final String id;
 
   const NewNoteWidget({Key key, this.id}) : super(key: key);
 
@@ -82,7 +84,7 @@ class NewNoteWidget extends StatelessWidget {
 }
 
 class EditNoteWidget extends StatelessWidget {
-  final int id;
+  final String id;
 
   const EditNoteWidget({Key key, this.id}) : super(key: key);
 
@@ -105,19 +107,41 @@ class EditNoteWidget extends StatelessWidget {
 }
 
 class NotesModel extends ChangeNotifier {
-  Map<int, String> _notes = new HashMap();
-  int _nextID = 0;
+  Map<String, String> _notes = new HashMap();
 
-  List<MapEntry<int, String>> get() {
+
+  NotesModel() {
+    _loadFromPrefs();
+  }
+
+  List<MapEntry<String, String>> get() {
     return _notes.entries.toList();
   }
 
-  int add() {
-    return _nextID++;
+  String add() {
+    return new Uuid().v1();
   }
 
-  void set(int id, String note) {
+  void set(String id, String note) {
     this._notes[id] = note;
+    _saveNotes();
     notifyListeners();
+  }
+
+  void _loadFromPrefs() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> ids = prefs.getStringList("notes_index");
+
+    ids.forEach((id) {
+      _notes[id] = prefs.getString("notes:$id");
+    });
+
+    notifyListeners();
+  }
+
+  void _saveNotes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setStringList("notes_index", _notes.keys.map((id) => id.toString()).toList());
+    _notes.forEach((key, value) => prefs.setString("notes:$key", value));
   }
 }
